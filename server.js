@@ -30,27 +30,6 @@ const {
   CRON_SECRET_DC_KEEP_ALIVE
 } = process.env;
 
-
-import fs from "fs";
-import path from "path";
-
-const DATA_DIR = "./data";
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
-
-const getTodayFile = () =>
-  path.join(DATA_DIR, `${new Date().toISOString().slice(0,10)}.json`);
-
-const readDB = () => {
-  const file = getTodayFile();
-  if (!fs.existsSync(file)) return [];
-  return JSON.parse(fs.readFileSync(file, "utf8"));
-};
-
-const writeDB = data => {
-  fs.writeFileSync(getTodayFile(), JSON.stringify(data, null, 2));
-};
-
-
 /* ================== HELPERS ================== */
 
 const sbHeaders = {
@@ -91,12 +70,6 @@ const chatIdExists = async chatId => {
     { headers: sbHeaders }
   );
   return r.data.length > 0;
-};
-
-const saveClip = clip => {
-  const db = readDB();
-  db.push(clip);
-  writeDB(db);
 };
 
 
