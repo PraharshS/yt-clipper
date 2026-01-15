@@ -1,0 +1,21 @@
+{
+  "name": "yt-clipper-single-file",
+  "version": "1.0.0",
+  "description": "Single-file YouTube Nightbot clip backend with Supabase, Discord, and YouTube API",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "googleapis": "^140.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
