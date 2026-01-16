@@ -2,6 +2,7 @@ import express from "express";
 import axios from "axios";
 import dotenv from "dotenv";
 import cors from "cors";
+import { google } from "googleapis";
 
 dotenv.config();
 
@@ -34,6 +35,37 @@ console.log("🧩 ENV loaded:", {
   YT_API: !!YT_DATA_API_V3,
   DISCORD: !!DISCORD_BOT_TOKEN
 });
+
+/* ================== YOUTUBE OAUTH ================== */
+
+const {
+  YOUTUBE_CLIENT_ID,
+  YOUTUBE_CLIENT_SECRET,
+  YOUTUBE_REFRESH_TOKEN
+} = process.env;
+
+if (!YOUTUBE_CLIENT_ID || !YOUTUBE_CLIENT_SECRET || !YOUTUBE_REFRESH_TOKEN) {
+  console.error("❌ Missing YouTube OAuth env vars");
+  process.exit(1);
+}
+
+const ytAuth = new google.auth.OAuth2(
+  YOUTUBE_CLIENT_ID,
+  YOUTUBE_CLIENT_SECRET
+);
+
+// Use refresh token (auto-refreshes access token)
+ytAuth.setCredentials({
+  refresh_token: YOUTUBE_REFRESH_TOKEN
+});
+
+// 🔑 THIS is what fixes `yt is not defined`
+const yt = google.youtube({
+  version: "v3",
+  auth: ytAuth
+});
+
+console.log("✅ YouTube OAuth client initialized");
 
 /* ================== HELPERS ================== */
 
@@ -89,6 +121,177 @@ const tsToSeconds = ts => {
 };
 
 /* ================== YOUTUBE ================== */
+
+const postStreamTimestampsToYouTube = async (channelId) => {
+  console.log("⏰ [CRON] Posting stream timestamps");
+
+  // 1️⃣ Get last live / recent stream
+  const live = await getMostRecentPastBroadcastFromYT(channelId);
+
+  if (!live.video_id || !live.stream_start_time) {
+    console.warn("⚠️ No stream found, skipping cron");
+    return { skipped: true };
+  }
+
+  console.log("🎬 Stream resolved:", live.video_id);
+
+  // 2️⃣ Fetch all clips AFTER stream start
+  const clipsRes = await axios.get(
+    `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}`,
+    {
+      params: {
+        channel_id: `eq.${channelId}`,
+        user_timestamp: `gte.${live.stream_start_time}`,
+        order: "user_timestamp.asc"
+      },
+      headers: sbHeaders
+    }
+  );
+
+  const clips = clipsRes.data;
+
+  if (!clips.length) {
+    console.warn("⚠️ No clips found for stream");
+    return { empty: true };
+  }
+
+  console.log(`📎 ${clips.length} clips found`);
+
+  // 3️⃣ Build timestamp comment
+  let comment = "🔥 Stream Highlights\n\n";
+
+  for (const clip of clips) {
+    const ts = formatTimestamp(
+      live.stream_start_time,
+      clip.user_timestamp,
+      clip.delay
+    );
+
+    const safeMsg = (clip.message || "Clip")
+      .replace(/\n/g, " ")
+      .slice(0, 80);
+
+    comment += `${ts} – ${safeMsg}\n`;
+  }
+
+  console.log("📝 Comment built");
+
+  // 4️⃣ Post comment to YouTube
+  await yt.commentThreads.insert({
+    part: ["snippet"],
+    requestBody: {
+      snippet: {
+        videoId: live.video_id,
+        topLevelComment: {
+          snippet: {
+            textOriginal: comment
+          }
+        }
+      }
+    }
+  });
+
+  console.log("✅ Timestamp comment posted");
+
+  return { posted: true, count: clips.length };
+};
+
+app.all("/api/cron/post-timestamps", async (req, res) => {
+  const secret = req.query.secret || req.headers["x-cron-secret"];
+
+  if (secret !== process.env.CRON_SECRET_YT_TIMESTAMPS)
+    return res.status(401).json({ error: "Unauthorized" });
+
+  // 👇 YOUR CHANNEL ID (hardcode or env)
+  const CHANNEL_ID = req.query.channelId;
+
+  if (!CHANNEL_ID)
+    return res.status(400).json({ error: "Missing channelId" });
+
+  try {
+    const result = await postStreamTimestampsToYouTube(CHANNEL_ID);
+    res.json({ ok: true, result });
+  } catch (e) {
+    console.error("❌ Cron failed", e.message);
+    res.status(500).json({ error: "Cron failed" });
+  }
+});
+
+const getMostRecentPastBroadcastFromYT = async (channelId) => {
+  console.log("🎥 Fetching most recent past broadcast");
+
+  try {
+    // 1️⃣ Find last completed livestream
+    const search = await axios.get(
+      "https://www.googleapis.com/youtube/v3/search",
+      {
+        params: {
+          part: "snippet",
+          channelId,
+          eventType: "completed", // 🔑 KEY CHANGE
+          type: "video",
+          order: "date",
+          maxResults: 1,
+          key: YT_DATA_API_V3
+        }
+      }
+    );
+
+    const item = search.data.items?.[0];
+    if (!item) {
+      console.warn("⚠️ No past livestream found");
+      return {};
+    }
+
+    const videoId = item.id.videoId;
+    const title = item.snippet.title;
+
+    console.log("🎬 Past broadcast found:", { videoId, title });
+
+    // 2️⃣ Fetch start & end time
+    const video = await axios.get(
+      "https://www.googleapis.com/youtube/v3/videos",
+      {
+        params: {
+          part: "liveStreamingDetails",
+          id: videoId,
+          key: YT_DATA_API_V3
+        }
+      }
+    );
+
+    const details = video.data.items?.[0]?.liveStreamingDetails;
+
+    const streamStartTime = details?.actualStartTime || null;
+    const streamEndTime = details?.actualEndTime || null;
+
+    if (!streamStartTime || !streamEndTime) {
+      console.warn("⚠️ Broadcast missing start/end time");
+      return {};
+    }
+
+    console.log("🕒 Stream window:", {
+      start: streamStartTime,
+      end: streamEndTime
+    });
+
+    return {
+      video_id: videoId,
+      title,
+      stream_start_time: streamStartTime,
+      stream_end_time: streamEndTime
+    };
+
+  } catch (e) {
+    console.error("❌ Failed to fetch past broadcast", {
+      status: e?.response?.status,
+      data: e?.response?.data,
+      msg: e.message
+    });
+    return {};
+  }
+};
+
 
 const getLiveStreamInfoFromYT = async channelId => {
   console.log("🎥 getLiveStreamInfoFromYT()", channelId);
