@@ -171,7 +171,7 @@ const sendDiscord = async (dcId, videoId, title, msg, user, ts) => {
       `https://discord.com/api/v10/channels/${dcId}/messages`,
       {
         embeds: [{
-          title: "📎 New Clip",
+          title: title || "📎 New Clip",
           url: `https://youtube.com/watch?v=${videoId}&t=${tsToSeconds(ts)}s`,
           image: { url: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` },
           fields: [
@@ -196,7 +196,7 @@ const sendDiscord = async (dcId, videoId, title, msg, user, ts) => {
       status: e?.response?.status,
       data: e?.response?.data,
       msg: e.message,
-      error: e?.response.data.errors.channel_id._errors
+      error: e?.response?.data?.errors?.channel_id?._errors
     });
   }
 };
