@@ -171,7 +171,7 @@ const sendDiscord = async (dcId, videoId, title, msg, user, ts) => {
       `https://discord.com/api/v10/channels/${dcId}/messages`,
       {
         embeds: [{
-          title: title || "📎 New Clip",
+          title: msg || "📎 New Clip",
           url: `https://youtube.com/watch?v=${videoId}&t=${tsToSeconds(ts)}s`,
           image: { url: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` },
           fields: [
