@@ -74,8 +74,8 @@ const formatTimestamp = (start, user, delay) => {
   const sec = d % 60;
 
   const ts = h
-    ? `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`
-    : `${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
+    ? `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
+    : `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 
   console.log("⏱ timestamp result:", ts);
   return ts;
@@ -83,7 +83,7 @@ const formatTimestamp = (start, user, delay) => {
 
 const tsToSeconds = ts => {
   const p = ts.split(":").map(Number);
-  const sec = p.length === 2 ? p[0]*60+p[1] : p[0]*3600+p[1]*60+p[2];
+  const sec = p.length === 2 ? p[0] * 60 + p[1] : p[0] * 3600 + p[1] * 60 + p[2];
   console.log("🔢 tsToSeconds", ts, sec);
   return sec;
 };
@@ -256,16 +256,70 @@ app.all("/api/clip", async (req, res) => {
       live.video_id,
       live.title,
       msg,
-      user.replace("@",""),
+      user.replace("@", ""),
       ts
     );
   } else {
     console.warn("⚠️ Discord not sent (live data missing)");
   }
+  /* ================== CHAT RESPONSE LOGIC ================== */
 
-  return res.send(
-    `Timestamped (with -${delay}s delay) by ${user}. Tool used: ${TOOL_USED}`
-  );
+  const lowerMsg = msg.toLowerCase();
+
+  const aceResponses = [
+    `🔥 ACE CONFIRMED! @${user} just witnessed greatness.`,
+    `🎯 Clean ACE clipped by @${user}. This one deserved a clip.`,
+    `💀 ACE moment secured by @${user}. Unreal.`,
+    `🚨 ACE ALERT 🚨 @${user} said “clip that”.`
+  ];
+
+  const whiffResponses = [
+    `😬 WHIFF DETECTED. @${user} had to clip this.`,
+    `🎯❌ That aim… @${user} clipped the pain.`,
+    `😂 Even pros miss sometimes. Thanks @${user}.`,
+    `💀 Whiff so bad @${user} clipped it instantly.`
+  ];
+
+  const gyanResponses = [
+    `🤓 Educational content by @${user}. Take notes, chat.`,
+    `📚 GYAN MODE ON. @${user} clipped some knowledge.`,
+    `🧠 Big brain moment detected. Thanks @${user}.`,
+    `📖 Game ka Gyan 101 — clipped by @${user}.`
+  ];
+  const funnyResponses = [
+    `😂 Comedy gold detected. Thanks for the clip @${user}.`,
+    `🤣 This moment had NO BUSINESS being this funny. Clipped by @${user}`,
+    `🎭 Absolute cinema. @${user} clipped the chaos.`,
+    `💀 Chat, we’re never letting this go. Clipped by @${user}`,
+    `🤣 Certified funny moment — archived by @${user}.`
+  ];
+
+
+  const defaultResponses = [
+    `🎬 Clip secured by @${user} — Zittu Ka Bot did the rest 😎`,
+    `🚨 CLIP ALERT 🚨 @${user} just exposed this moment.`,
+    `📎 @${user} clipped it. Discord has been notified.`,
+    `😈 No escape now. @${user} clipped this.`,
+    `🔥 Legendary moment locked in by @${user}.`
+  ];
+
+  let responsePool = defaultResponses;
+
+  if (lowerMsg.includes("ace")) {
+    responsePool = aceResponses;
+  } else if (lowerMsg.includes("whiff")) {
+    responsePool = whiffResponses;
+  } else if (lowerMsg.includes("gyan")) {
+    responsePool = gyanResponses;
+  } else if (lowerMsg.includes("funny")) {
+    responsePool = funnyResponses;
+  }
+
+  const randomMessage =
+    responsePool[Math.floor(Math.random() * responsePool.length)];
+
+  return res.send(randomMessage);
+
 });
 
 /* ================== CRON ================== */
