@@ -120,6 +120,91 @@ const tsToSeconds = ts => {
   return sec;
 };
 
+/* ================== TOP CHATTERS ================== */
+
+const getTopChattersFromLastBroadcast = async (channelId, limit = 10) => {
+  console.log("🏆 Fetching top chatters for last broadcast", channelId);
+
+  try {
+    // 1️⃣ Get last completed broadcast
+    const broadcast = await getMostRecentPastBroadcastFromYT(channelId);
+    if (!broadcast.video_id) {
+      console.warn("⚠️ No broadcast found");
+      return [];
+    }
+
+    // 2️⃣ Get liveChatId
+    const videoRes = await axios.get(
+      "https://www.googleapis.com/youtube/v3/videos",
+      {
+        params: {
+          part: "liveStreamingDetails",
+          id: broadcast.video_id,
+          key: YT_DATA_API_V3
+        }
+      }
+    );
+    console.log(videoRes.data.items , "videoRes");
+    
+    const liveChatId =
+      videoRes.data.items?.[0]?.liveStreamingDetails?.activeLiveChatId;
+
+    if (!liveChatId) {
+      console.warn("⚠️ No liveChatId found");
+      return [];
+    }
+
+    console.log("💬 liveChatId:", liveChatId);
+
+    // 3️⃣ Fetch ALL chat messages (pagination)
+    let nextPageToken = null;
+    const counts = {};
+
+    do {
+      const chatRes = await axios.get(
+        "https://www.googleapis.com/youtube/v3/liveChatMessages",
+        {
+          params: {
+            part: "snippet,authorDetails",
+            liveChatId,
+            maxResults: 200,
+            pageToken: nextPageToken,
+            key: YT_DATA_API_V3
+          }
+        }
+      );
+
+      for (const item of chatRes.data.items || []) {
+        const name = item.authorDetails?.displayName;
+        if (!name) continue;
+
+        counts[name] = (counts[name] || 0) + 1;
+      }
+
+      nextPageToken = chatRes.data.nextPageToken;
+    } while (nextPageToken);
+
+    // 4️⃣ Sort & return top N
+    const leaderboard = Object.entries(counts)
+      .map(([user, messages]) => ({ user, messages }))
+      .sort((a, b) => b.messages - a.messages)
+      .slice(0, limit);
+
+    console.log("🏆 Top chatters:", leaderboard);
+
+    return leaderboard;
+
+  } catch (e) {
+    console.error("❌ Failed to fetch top chatters", {
+      msg: e.message,
+      status: e?.response?.status,
+      data: e?.response?.data
+    });
+    return [];
+  }
+};
+
+
 /* ================== YOUTUBE ================== */
 
 const postStreamTimestampsToYouTube = async (channelId) => {
@@ -195,6 +280,24 @@ const postStreamTimestampsToYouTube = async (channelId) => {
 
   return { posted: true, count: clips.length };
 };
+
+app.get("/api/top-chatters", async (req, res) => {
+  const { channelId, limit = 10 } = req.query;
+
+  if (!channelId)
+    return res.status(400).json({ error: "Missing channelId" });
+
+  try {
+    const data = await getTopChattersFromLastBroadcast(
+      channelId,
+      Number(limit)
+    );
+    res.json({ ok: true, topChatters: data });
+  } catch (e) {
+    res.status(500).json({ error: "Failed to fetch top chatters" });
+  }
+});
+
 
 app.all("/api/cron/post-timestamps", async (req, res) => {
   const secret = req.query.secret || req.headers["x-cron-secret"];
@@ -484,26 +587,26 @@ app.all("/api/clip", async (req, res) => {
   ];
 
   const gyanResponses = [
-    `🤓 Educational content by @${user}. Take notes, chat.`,
-    `📚 GYAN MODE ON. @${user} clipped some knowledge.`,
-    `🧠 Big brain moment detected. Thanks @${user}.`,
-    `📖 Game ka Gyan 101 — clipped by @${user}.`
+    `🤓 Educational content by ${user}. Take notes, chat.`,
+    `📚 GYAN MODE ON. ${user} clipped some knowledge.`,
+    `🧠 Big brain moment detected. Thanks ${user}.`,
+    `📖 Game ka Gyan 101 — clipped by ${user}.`
   ];
   const funnyResponses = [
-    `😂 Comedy gold detected. Thanks for the clip @${user}.`,
-    `🤣 This moment had NO BUSINESS being this funny. Clipped by @${user}`,
-    `🎭 Absolute cinema. @${user} clipped the chaos.`,
-    `💀 Chat, we’re never letting this go. Clipped by @${user}`,
-    `🤣 Certified funny moment — archived by @${user}.`
+    `😂 Comedy gold detected. Thanks for the clip ${user}.`,
+    `🤣 This moment had NO BUSINESS being this funny. Clipped by ${user}`,
+    `🎭 Absolute cinema. ${user} clipped the chaos.`,
+    `💀 Chat, we’re never letting this go. Clipped by ${user}`,
+    `🤣 Certified funny moment — archived by ${user}.`
   ];
 
 
   const defaultResponses = [
-    `🎬 Clip secured by @${user} — Zittu Ka Bot did the rest 😎`,
-    `🚨 CLIP ALERT 🚨 @${user} just exposed this moment.`,
-    `📎 @${user} clipped it. Discord has been notified.`,
-    `😈 No escape now. @${user} clipped this.`,
-    `🔥 Legendary moment locked in by @${user}.`
+    `🎬 Clip secured by ${user} — Zittu Ka Bot did the rest 😎`,
+    `🚨 CLIP ALERT 🚨 ${user} just exposed this moment.`,
+    `📎 ${user} clipped it. Discord has been notified.`,
+    `😈 No escape now. ${user} clipped this.`,
+    `🔥 Legendary moment locked in by ${user}.`
   ];
 
   let responsePool = defaultResponses;
