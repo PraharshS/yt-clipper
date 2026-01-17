@@ -1,6 +1,0 @@
-{
-  "crons": [{
-    "path": "/api/cron/post-timestamps?secret=local_test_secret",
-    "schedule": "*/10 * * * *"
-  }]
-}
