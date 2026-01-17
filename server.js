@@ -26,7 +26,9 @@ const {
   DISCORD_CHANNEL_ID,
   TOOL_USED,
   CRON_SECRET,
-  CRON_SECRET_DC_KEEP_ALIVE
+  CRON_SECRET_YT_TIMESTAMPS,
+  CRON_SECRET_DC_KEEP_ALIVE,
+  CURRENT_CHANNEL_ID
 } = process.env;
 
 console.log("🧩 ENV loaded:", {
@@ -302,11 +304,11 @@ app.get("/api/top-chatters", async (req, res) => {
 app.all("/api/cron/post-timestamps", async (req, res) => {
   const secret = req.query.secret || req.headers["x-cron-secret"];
 
-  if (secret !== process.env.CRON_SECRET_YT_TIMESTAMPS)
+  if (secret !== CRON_SECRET_YT_TIMESTAMPS)
     return res.status(401).json({ error: "Unauthorized" });
 
   // 👇 YOUR CHANNEL ID (hardcode or env)
-  const CHANNEL_ID = req.query.channelId;
+  const CHANNEL_ID = CURRENT_CHANNEL_ID;
 
   if (!CHANNEL_ID)
     return res.status(400).json({ error: "Missing channelId" });
@@ -573,17 +575,17 @@ app.all("/api/clip", async (req, res) => {
   const lowerMsg = msg.toLowerCase();
 
   const aceResponses = [
-    `🔥 ACE CONFIRMED! @${user} just witnessed greatness.`,
-    `🎯 Clean ACE clipped by @${user}. This one deserved a clip.`,
-    `💀 ACE moment secured by @${user}. Unreal.`,
-    `🚨 ACE ALERT 🚨 @${user} said “clip that”.`
+    `🔥 ACE CONFIRMED! ${user} just witnessed greatness.`,
+    `🎯 Clean ACE clipped by ${user}. This one deserved a clip.`,
+    `💀 ACE moment secured by ${user}. Unreal.`,
+    `🚨 ACE ALERT 🚨 ${user} said “clip that”.`
   ];
 
   const whiffResponses = [
-    `😬 WHIFF DETECTED. @${user} had to clip this.`,
-    `🎯❌ That aim… @${user} clipped the pain.`,
-    `😂 Even pros miss sometimes. Thanks @${user}.`,
-    `💀 Whiff so bad @${user} clipped it instantly.`
+    `😬 WHIFF DETECTED. ${user} had to clip this.`,
+    `🎯❌ That aim… ${user} clipped the pain.`,
+    `😂 Even pros miss sometimes. Thanks ${user}.`,
+    `💀 Whiff so bad ${user} clipped it instantly.`
   ];
 
   const gyanResponses = [
