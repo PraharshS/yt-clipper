@@ -1,6 +1,12 @@
 {
-  "crons": [{
-    "path": "/api/cron/post-timestamps?secret=local_test_secret",
-    "schedule": "30 3 * * *"
-  }]
+  "crons": [
+    {
+      "path": "/api/cron/post-timestamps?secret=local_test_secret",
+      "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/post-discord-digest?secret=YOUR_SECRET",
+      "schedule": "0 3 * * *"
+    }
+  ]
 }

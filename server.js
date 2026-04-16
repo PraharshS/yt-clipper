@@ -509,7 +509,98 @@ const sendDiscord = async (dcId, videoId, title, msg, user, ts) => {
   }
 };
 
+
+const postDailyClipsToDiscord = async (channelId) => {
+  console.log("📦 [CRON] Posting daily clips to Discord");
+
+  // 1️⃣ Get last completed stream
+  const live = await getMostRecentPastBroadcastFromYT(channelId);
+
+  if (!live.video_id || !live.stream_start_time) {
+    console.warn("⚠️ No stream found");
+    return { skipped: true };
+  }
+
+  // 2️⃣ Fetch clips
+  const clipsRes = await axios.get(
+    `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}`,
+    {
+      params: {
+        channel_id: `eq.${channelId}`,
+        user_timestamp: `gte.${live.stream_start_time}`,
+        order: "user_timestamp.asc"
+      },
+      headers: sbHeaders
+    }
+  );
+
+  const clips = clipsRes.data;
+
+  if (!clips.length) {
+    console.warn("⚠️ No clips found");
+    return { empty: true };
+  }
+
+  console.log(`📎 ${clips.length} clips found`);
+
+  const streamUrl = `https://youtube.com/watch?v=${live.video_id}`;
+
+  let message = `🔥 **Stream Highlights**\n`;
+  message += `🎬 ${streamUrl}\n\n`;
+
+  for (const clip of clips) {
+    const ts = formatTimestamp(
+      live.stream_start_time,
+      clip.user_timestamp,
+      clip.delay
+    );
+
+    const safeMsg = (clip.message || "Clip")
+      .replace(/\n/g, " ")
+      .slice(0, 80);
+
+    message += `**${ts}** – ${safeMsg}\n`;
+  }
+
+  // ⚠️ Discord 2000 char limit
+  if (message.length > 1900) {
+    message = message.slice(0, 1900) + "\n...and more clips";
+  }
+
+  // 4️⃣ Send to Discord
+  await axios.post(
+    `https://discord.com/api/v10/channels/${DISCORD_CHANNEL_ID}/messages`,
+    {
+      content: message
+    },
+    {
+      headers: {
+        Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
+        "Content-Type": "application/json"
+      }
+    }
+  );
+
+  console.log("✅ Discord digest sent");
+
+  return { posted: true, count: clips.length };
+};
 /* ================== ROUTES ================== */
+
+app.all("/api/cron/post-discord-digest", async (req, res) => {
+  const CHANNEL_ID = CURRENT_CHANNEL_ID;
+
+  if (!CHANNEL_ID)
+    return res.status(400).json({ error: "Missing channelId" });
+
+  try {
+    const result = await postDailyClipsToDiscord(CHANNEL_ID);
+    res.json({ ok: true, result });
+  } catch (e) {
+    console.error("❌ Discord digest cron failed", e.message);
+    res.status(500).json({ error: "Failed" });
+  }
+});
 
 app.all("/api/clip", async (req, res) => {
   console.log("🚨 /api/clip HIT", { body: req.body, query: req.query });
