@@ -648,19 +648,19 @@ app.all("/api/clip", async (req, res) => {
   const live = await getLiveStreamInfoFromYT(channelId);
   console.log("🎯 Live info:", live);
 
-  if (DISCORD_CHANNEL_ID && live.video_id && live.stream_start_time) {
-    const ts = formatTimestamp(live.stream_start_time, now, delay);
-    await sendDiscord(
-      DISCORD_CHANNEL_ID,
-      live.video_id,
-      live.title,
-      msg,
-      user.replace("@", ""),
-      ts
-    );
-  } else {
-    console.warn("⚠️ Discord not sent (live data missing)");
-  }
+  // if (DISCORD_CHANNEL_ID && live.video_id && live.stream_start_time) {
+  //   const ts = formatTimestamp(live.stream_start_time, now, delay);
+  //   await sendDiscord(
+  //     DISCORD_CHANNEL_ID,
+  //     live.video_id,
+  //     live.title,
+  //     msg,
+  //     user.replace("@", ""),
+  //     ts
+  //   );
+  // } else {
+  //   console.warn("⚠️ Discord not sent (live data missing)");
+  // }
   /* ================== CHAT RESPONSE LOGIC ================== */
 
   const lowerMsg = msg.toLowerCase();
